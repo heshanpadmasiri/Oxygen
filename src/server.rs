@@ -9,9 +9,14 @@ pub mod oxygen {
     tonic::include_proto!("oxygen_lib");
 }
 
-#[derive(Default)]
 pub struct OxygenService {
     id: Uuid,
+}
+
+impl Default for OxygenService {
+    fn default() -> Self {
+        Self { id: uuid::Uuid::new_v4() }
+    }
 }
 #[tonic::async_trait]
 impl Oxygen for OxygenService {
@@ -56,14 +61,21 @@ impl Oxygen for OxygenService {
                     "Get collection request from: {:?} for collection: {:?}",
                     &client.uuid, collection_id
                 );
-                Ok(Response::new(CollectionResponse {
-                    successful: true,
-                    collections: get_collection(collection_id),
-                }))
+                match get_collection(collection_id) {
+                    Ok(collections) => {
+                        Ok(Response::new(CollectionResponse {
+                            successful: true,
+                            collections
+                        }))
+                    },
+                    Err(()) => {
+                        Err(Status::new(tonic::Code::InvalidArgument, format!("Failed to find collection with id: {}", collection_id)))
+                    }
+                }
             }
-            _ => {
-                let message = format!("Unexpected request for get collection").to_owned();
-                eprintln!("{message}");
+            CollectionRequest { client_id: None, collection_id } => {
+                let message = format!("Got collection request for {} without client Id", collection_id);
+                eprintln!("{}", message);
                 Err(Status::new(tonic::Code::InvalidArgument, message))
             }
         }
@@ -75,19 +87,17 @@ fn get_collection_all() -> Vec<Collection> {
     vec![]
 }
 
-fn get_collection(_id: u64) -> Vec<Collection> {
-    vec![]
+fn get_collection(_id: u64) -> Result<Vec<Collection>, ()> {
+    Ok(vec![])
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // TODO: take this from a config file
     let addr = "[::1]:50051".parse()?;
     let oxygen_service = OxygenService::default();
     tonic::transport::Server::builder()
         .add_service(OxygenServer::new(oxygen_service))
         .serve(addr)
         .await?;
-
     Ok(())
 }

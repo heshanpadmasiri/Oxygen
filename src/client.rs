@@ -8,12 +8,10 @@ pub mod oxygen {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut client = OxygenClient::connect("http://[::1]:50051").await?;
 
-    let request = tonic::Request::new(
-        Req {
-            msg: "test message".to_owned(),
-            id: 0
-        }
-    );
+    let request = tonic::Request::new(Req {
+        msg: "test message".to_owned(),
+        id: 0,
+    });
 
     let response = client.hello(request).await?;
     println!("RESPONSE={:?}", response);

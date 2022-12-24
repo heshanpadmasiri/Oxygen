@@ -18,7 +18,7 @@ impl Oxygen for OxygenService {
         let req = request.into_inner();
 
         let reply = Res {
-            msg: format!("Recieved : {}", req.msg).into(),
+            msg: format!("Recieved : {}", req.msg),
             successful: true,
         };
         Ok(Response::new(reply))

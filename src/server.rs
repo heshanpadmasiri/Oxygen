@@ -82,6 +82,7 @@ impl Oxygen for OxygenService {
     }
 }
 
+// TODO: factor these functions to separate module
 // FIXME:
 fn get_collection_all() -> Vec<Collection> {
     vec![]
@@ -93,11 +94,57 @@ fn get_collection(_id: u64) -> Result<Vec<Collection>, ()> {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let addr = "[::1]:50051".parse()?;
+    let addr = "[::1]:50050".parse()?;
     let oxygen_service = OxygenService::default();
     tonic::transport::Server::builder()
         .add_service(OxygenServer::new(oxygen_service))
         .serve(addr)
         .await?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+
+    use crate::oxygen::oxygen_client::OxygenClient;
+
+    #[tokio::test]
+    async fn can_initialize_server() {
+        let port = 50051;
+        let addr = format!("[::1]:{}", port).parse().expect("Hardcoded IP address must be valid");
+        let oxygen_service = crate::OxygenService::default();
+        let join_handle = tokio::spawn(async move {
+            tonic::transport::Server::builder()
+                .add_service(crate::oxygen::oxygen_server::OxygenServer::new(oxygen_service))
+                .serve(addr)
+                .await
+                .expect("failed to start the server");
+        });
+        join_handle.abort()
+    }
+
+    #[tokio::test]
+    async fn client_can_register_with_server() {
+        let port = 50052;
+        let addr = format!("[::1]:{}", port).parse().expect("Hardcoded IP address must be valid");
+        let oxygen_service = crate::OxygenService::default();
+        let server_id = oxygen_service.id;
+        let join_handle = tokio::spawn(async move {
+            tonic::transport::Server::builder()
+                .add_service(crate::oxygen::oxygen_server::OxygenServer::new(oxygen_service))
+                .serve(addr)
+                .await
+                .expect("failed to start the server");
+        });
+        tokio::spawn(async move {
+            let mut client = OxygenClient::connect(format!("http://[::1]:{}", port)).await.expect("failed to create client");
+            let uuid = uuid::Uuid::new_v4().to_string();
+            let reg_request = tonic::Request::new(crate::oxygen::ClientId { uuid: uuid.to_owned() });
+            let res = client.register(reg_request).await.expect("failed to get response from server").into_inner();
+            assert_eq!(res.client_id, uuid);
+            assert_eq!(res.server_id, server_id.to_string());
+            assert!(res.successful)
+        }).await.expect("failed to run client");
+        join_handle.abort()
+    }
 }

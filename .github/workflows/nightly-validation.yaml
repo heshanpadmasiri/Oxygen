@@ -19,11 +19,15 @@ jobs:
           profile: minimal
           toolchain: ${{ matrix.rust }}
           override: true
-      - name: Install protoc
+      - name: Install protoc linux
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install protobuf-compiler
+      - name: Install protoc Mac
+        if: runner.os == 'macOS'
+        run: |
+          brew install protobuf
       - uses: actions-rs/cargo@v1
         with:
           command: build

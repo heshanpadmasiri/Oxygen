@@ -12,16 +12,13 @@ message ClientId {
     string uuid = 1;
 }
 
-// XXX: do we need these succesful flags since server already return a result?
 message RegResponse {
     string clientId = 1;
     string serverId = 2;
-    bool successful = 3;
 }
 
 // XXX: think if it is work it to seperate this for cases that return only 1 collectons
 message CollectionResponse {
-    bool successful = 1;
     repeated Collection collections = 2;
 }
 
@@ -31,7 +28,6 @@ message CollectionRequest {
 }
 
 message FileResponse {
-    bool successful = 1;
     File file = 2;
 }
 
@@ -39,7 +35,6 @@ message FileRequest {
     ClientId clientId = 1;
     uint64 fileId = 2;
 }
-
 
 // XXX: ideally client must be agnostic to the folder structure
 message Collection {

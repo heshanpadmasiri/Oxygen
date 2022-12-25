@@ -34,9 +34,9 @@ impl Oxygen for OxygenService {
         // TODO: setup logging
         println!("Get register request from: {:?}", &client_id.uuid);
 
-        let reply = Res {
-            msg: format!("Recieved : {}", req.msg),
-            successful: true,
+        let reply = RegResponse {
+            client_id: client_id.uuid,
+            server_id: self.id.to_string()
         };
         Ok(Response::new(reply))
     }
@@ -51,7 +51,6 @@ impl Oxygen for OxygenService {
         println!("Get all collection request from: {:?}", &client_id.uuid);
 
         Ok(Response::new(CollectionResponse {
-            successful: true,
             collections: self.storage.get_collection_all(),
         }))
     }
@@ -71,8 +70,7 @@ impl Oxygen for OxygenService {
                 );
                 match self.storage.get_collection(collection_id) {
                     Ok(collections) => Ok(Response::new(CollectionResponse {
-                        successful: true,
-                        collections: vec![collections],
+                        collections: vec![collections]
                     })),
                     Err(()) => Err(Status::new(
                         tonic::Code::InvalidArgument,
@@ -102,7 +100,7 @@ impl Oxygen for OxygenService {
                     &client.uuid, file_id
                 );
                 match self.storage.get_file(file_id) {
-                    Ok(file) => Ok(Response::new(FileResponse { successful: true, file: Some(file) })),
+                    Ok(file) => Ok(Response::new(FileResponse { file: Some(file) })),
                     Err(()) => Err(Status::new(
                         tonic::Code::InvalidArgument,
                         format!("Failed to find file with id: {}", file_id),
@@ -191,7 +189,6 @@ mod tests {
                 .into_inner();
             assert_eq!(res.client_id, uuid);
             assert_eq!(res.server_id, server_id.to_string());
-            assert!(res.successful)
         })
         .await
         .expect("failed to run client");
@@ -232,7 +229,6 @@ mod tests {
                 .await
                 .expect("failed to get get all collections")
                 .into_inner();
-            assert!(collection_res.successful);
             // XXX: hardcoded collection
             assert!(collection_res.collections.len() == 5);
         })
@@ -275,12 +271,10 @@ mod tests {
                     }),
                     collection_id: id
                 };
-                let collection_res = client
+                let _ = client
                     .get_collection(tonic::Request::new(collection_request))
                     .await
-                    .expect("failed to get get collection")
-                    .into_inner();
-                assert!(collection_res.successful);
+                    .expect("failed to get get collection");
             }
         })
         .await
@@ -369,12 +363,10 @@ mod tests {
                     }),
                     file_id: id
                 };
-                let collection_res = client
+                let _ = client
                     .get_file(tonic::Request::new(file_request))
                     .await
-                    .expect("failed to get get all collections")
-                    .into_inner();
-                assert!(collection_res.successful);
+                    .expect("failed to get get all collections");
             }
         })
         .await

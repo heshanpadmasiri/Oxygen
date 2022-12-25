@@ -5,7 +5,9 @@ service Oxygen {
     rpc register(ClientId) returns (RegResponse);
     rpc getAllCollections(ClientId) returns (CollectionResponse);
     rpc getCollection(CollectionRequest) returns (CollectionResponse);
+    // getFile should give enough information to showing file exists (file name, [type]) but not its body
     rpc getFile(FileRequest) returns (FileResponse);
+    rpc getFileContent(FileRequest) returns (FileContent);
 }
 
 message ClientId {
@@ -47,4 +49,8 @@ message Collection {
 message File {
     string name = 1;
     uint64 id = 2; // unique within the server
+}
+
+message FileContent {
+    bytes body = 1;
 }

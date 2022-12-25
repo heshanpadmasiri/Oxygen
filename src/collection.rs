@@ -1,4 +1,6 @@
-use crate::oxygen::{Collection, File};
+// XXX: it is better if the collection module take the view of files as is instead of
+// trying to match the gRPC message types
+use crate::oxygen::{Collection, File, FileContent};
 
 pub trait Storage {
     // TODO: this needs to be a singleton
@@ -8,6 +10,7 @@ pub trait Storage {
     fn get_collection(&self, id: u64) -> Result<Collection, ()>;
     // TODO: this needs to return proper errors
     fn get_file(&self, id: u64) -> Result<File, ()>;
+    fn get_file_content(&self, id: u64) -> Result<FileContent, ()>;
 }
 
 pub struct HardCodedStorage {
@@ -27,7 +30,6 @@ pub struct HardCodedStorage {
 /// -- f_1.md
 impl Storage for HardCodedStorage {
     fn new() -> Self where Self: Sized {
-        println!("start hard coded storage creation");
         let collection_0 = Collection {
             name: "collection_1".to_string(),
             id: 0,
@@ -76,7 +78,6 @@ impl Storage for HardCodedStorage {
         };
         let hard_coded_collections = vec![collection_0, collection_1, collection_2, collection_3, collection_4];
         let hard_coded_files = vec![f_1, f_2, f_3, f_4];
-        println!("hardcoded storage created");
         Self { hard_coded_collections, hard_coded_files }
     }
 
@@ -100,6 +101,18 @@ impl Storage for HardCodedStorage {
         }
         else {
             Err(())
+        }
+    }
+
+    fn get_file_content(&self, id: u64) -> Result<FileContent, ()> {
+        match self.get_file(id) {
+            Ok(file) => {
+                let body = format!("# {} content", file.name).as_bytes().to_vec();
+                Ok(FileContent { body })
+            }
+            Err(_) => {
+                Err(())
+            }
         }
     }
 

@@ -1,0 +1,50 @@
+syntax = "proto3";
+package oxygen_lib;
+
+service Oxygen {
+  rpc register(ClientId) returns (RegResponse);
+  rpc getAllCollections(ClientId) returns (CollectionResponse);
+  rpc getCollection(CollectionRequest) returns (CollectionResponse);
+  // getFile should give enough information to showing file exists (file name,
+  // [type]) but not its body
+  rpc getFile(FileRequest) returns (FileResponse);
+  rpc getFileContent(FileRequest) returns (FileContent);
+}
+
+message ClientId { string uuid = 1; }
+
+message RegResponse {
+  string clientId = 1;
+  string serverId = 2;
+}
+
+// XXX: think if it is worth it to seperate this for cases that return only 1
+// collecton
+message CollectionResponse { repeated Collection collections = 2; }
+
+message CollectionRequest {
+  ClientId clientId = 1;
+  uint64 collectionId = 2;
+}
+
+message FileResponse { File file = 2; }
+
+message FileRequest {
+  ClientId clientId = 1;
+  uint64 fileId = 2;
+}
+
+// XXX: ideally client must be agnostic to the actual folder structure
+message Collection {
+  string name = 1;
+  uint64 id = 2; // unique within the server
+  repeated Collection childCollections = 3;
+  repeated File files = 4;
+}
+
+message File {
+  string name = 1;
+  uint64 id = 2; // unique within the server
+}
+
+message FileContent { bytes body = 1; }

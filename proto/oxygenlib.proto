@@ -12,6 +12,7 @@ message ClientId {
     string uuid = 1;
 }
 
+// XXX: do we need these succesful flags since server already return a result?
 message RegResponse {
     string clientId = 1;
     string serverId = 2;

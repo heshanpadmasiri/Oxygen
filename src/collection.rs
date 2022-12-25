@@ -42,7 +42,7 @@ impl Storage for HardCodedStorage {
             name: "collection 1".to_string(),
             id: 1,
             child_collections: vec![collection_0.clone()],
-            files: vec![f_2]
+            files: vec![f_2.clone()]
         };
         let f_3= File {
             name: "f 3.md".to_string(),
@@ -58,10 +58,6 @@ impl Storage for HardCodedStorage {
             child_collections: vec![],
             files: vec![f_3.clone(), f_4.clone()]
         };
-        let f_2= File {
-            name: "f 2.md".to_string(),
-            id: 3
-        };
         let collection_3 = Collection {
             name: "collection 3".to_string(),
             id: 3,
@@ -70,9 +66,15 @@ impl Storage for HardCodedStorage {
         };
         let f_1= File {
             name: "f_1.md".to_string(),
-            id: 4
+            id: 3
         };
-        let hard_coded_collections = vec![collection_0, collection_1, collection_2, collection_3];
+        let collection_4 = Collection {
+            name: "collection 4".to_string(),
+            id: 4,
+            child_collections: vec![collection_3.clone()],
+            files: vec![f_1.clone()]
+        };
+        let hard_coded_collections = vec![collection_0, collection_1, collection_2, collection_3, collection_4];
         let hard_coded_files = vec![f_1, f_2, f_3, f_4];
         println!("hardcoded storage created");
         Self { hard_coded_collections, hard_coded_files }

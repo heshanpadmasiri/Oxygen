@@ -5,6 +5,7 @@ service Oxygen {
     rpc register(ClientId) returns (RegResponse);
     rpc getAllCollections(ClientId) returns (CollectionResponse);
     rpc getCollection(CollectionRequest) returns (CollectionResponse);
+    rpc getFile(FileRequest) returns (FileResponse);
 }
 
 message ClientId {
@@ -17,6 +18,7 @@ message RegResponse {
     bool successful = 3;
 }
 
+// XXX: think if it is work it to seperate this for cases that return only 1 collectons
 message CollectionResponse {
     bool successful = 1;
     repeated Collection collections = 2;
@@ -26,6 +28,17 @@ message CollectionRequest {
     ClientId clientId = 1;
     uint64 collectionId = 2;
 }
+
+message FileResponse {
+    bool successful = 1;
+    File file = 2;
+}
+
+message FileRequest {
+    ClientId clientId = 1;
+    uint64 fileId = 2;
+}
+
 
 // XXX: ideally client must be agnostic to the folder structure
 message Collection {

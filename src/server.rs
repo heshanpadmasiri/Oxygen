@@ -1,7 +1,7 @@
 use collection::{HardCodedStorage, Storage};
 use oxygen::{
     oxygen_server::{Oxygen, OxygenServer},
-    ClientId, CollectionRequest, CollectionResponse, RegResponse,
+    ClientId, CollectionRequest, CollectionResponse, RegResponse, FileRequest, FileResponse,
 };
 use tonic::{Request, Response, Status};
 use uuid::Uuid;
@@ -93,6 +93,35 @@ impl Oxygen for OxygenService {
             }
         }
     }
+
+    async fn get_file(&self, request: Request<FileRequest>) -> Result<Response<FileResponse>, Status> {
+        match request.into_inner() {
+            FileRequest { client_id: Some(client), file_id } => {
+                println!(
+                    "Get file request from: {:?} for file: {:?}",
+                    &client.uuid, file_id
+                );
+                match self.storage.get_file(file_id) {
+                    Ok(file) => Ok(Response::new(FileResponse { successful: true, file: Some(file) })),
+                    Err(()) => Err(Status::new(
+                        tonic::Code::InvalidArgument,
+                        format!("Failed to find file with id: {}", file_id),
+                    )),
+                }
+            },
+            FileRequest {
+                client_id: None,
+                file_id
+            } => {
+                let message = format!(
+                    "Got file request for {} without client Id",
+                    file_id
+                );
+                eprintln!("{}", message);
+                Err(Status::new(tonic::Code::InvalidArgument, message))
+            }
+        }
+    }
 }
 
 #[tokio::main]
@@ -109,7 +138,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 #[cfg(test)]
 mod tests {
 
-    use crate::oxygen::{oxygen_client::OxygenClient, CollectionRequest, ClientId};
+    use crate::oxygen::{oxygen_client::OxygenClient, CollectionRequest, ClientId, FileRequest};
 
     #[tokio::test]
     async fn can_initialize_server() {
@@ -205,7 +234,7 @@ mod tests {
                 .into_inner();
             assert!(collection_res.successful);
             // XXX: hardcoded collection
-            assert!(collection_res.collections.len() == 4);
+            assert!(collection_res.collections.len() == 5);
         })
         .await
         .expect("failed to run client");
@@ -238,8 +267,8 @@ mod tests {
                 }))
                 .await
                 .expect("failed to register with server");
-            // XXX: hardcoded collection
-            for id in 0 .. 4 {
+            // XXX: hardcoded storage
+            for id in 0 .. 5 {
                 let collection_request = CollectionRequest {
                     client_id: Some(ClientId {
                         uuid: uuid.to_owned()
@@ -258,4 +287,57 @@ mod tests {
         .expect("failed to run client");
         join_handle.abort()
     }
+
+    // TODO: failing tests case for get collection by id
+
+
+    #[tokio::test]
+    async fn client_can_get_file_by_id() {
+        let port = 50055;
+        let addr = format!("[::1]:{}", port)
+            .parse()
+            .expect("Hardcoded IP address must be valid");
+        let oxygen_service = crate::OxygenService::default();
+        let join_handle = tokio::spawn(async move {
+            tonic::transport::Server::builder()
+                .add_service(crate::oxygen::oxygen_server::OxygenServer::new(
+                    oxygen_service,
+                ))
+                .serve(addr)
+                .await
+                .expect("failed to start the server");
+        });
+        tokio::spawn(async move {
+            let mut client = OxygenClient::connect(format!("http://[::1]:{}", port))
+                .await
+                .expect("failed to create client");
+            let uuid = uuid::Uuid::new_v4().to_string();
+            let _ = client
+                .register(tonic::Request::new(crate::oxygen::ClientId {
+                    uuid: uuid.to_owned(),
+                }))
+                .await
+                .expect("failed to register with server");
+            // XXX: hardcoded storage
+            for id in 0 .. 4 {
+                let file_request = FileRequest {
+                    client_id: Some(ClientId {
+                        uuid: uuid.to_owned()
+                    }),
+                    file_id: id
+                };
+                let collection_res = client
+                    .get_file(tonic::Request::new(file_request))
+                    .await
+                    .expect("failed to get get all collections")
+                    .into_inner();
+                assert!(collection_res.successful);
+            }
+        })
+        .await
+        .expect("failed to run client");
+        join_handle.abort()
+    }
+
+    // TODO: add failing test for get file
 }

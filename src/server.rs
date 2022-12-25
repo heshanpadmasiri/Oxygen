@@ -15,7 +15,7 @@ pub mod oxygen {
 
 pub struct OxygenService {
     id: Uuid,
-    // TODO: think how we can have different types for this
+    // TODO: think how we can have different types for this (probably we will do this as an enum)
     storage: HardCodedStorage,
 }
 
@@ -62,12 +62,12 @@ impl Oxygen for OxygenService {
     ) -> Result<Response<CollectionResponse>, Status> {
         match request.into_inner() {
             CollectionRequest {
-                client_id: Some(client),
+                client_id: Some(client_id),
                 collection_id,
             } => {
                 println!(
                     "Get collection request from: {:?} for collection: {:?}",
-                    &client.uuid, collection_id
+                    &client_id.uuid, collection_id
                 );
                 match self.storage.get_collection(collection_id) {
                     Ok(collections) => Ok(Response::new(CollectionResponse {
@@ -99,12 +99,12 @@ impl Oxygen for OxygenService {
     ) -> Result<Response<FileResponse>, Status> {
         match request.into_inner() {
             FileRequest {
-                client_id: Some(client),
+                client_id: Some(client_id),
                 file_id,
             } => {
                 println!(
                     "Get file request from: {:?} for file: {:?}",
-                    &client.uuid, file_id
+                    &client_id.uuid, file_id
                 );
                 match self.storage.get_file(file_id) {
                     Ok(file) => Ok(Response::new(FileResponse { file: Some(file) })),
@@ -131,12 +131,12 @@ impl Oxygen for OxygenService {
     ) -> Result<Response<FileContent>, Status> {
         match request.into_inner() {
             FileRequest {
-                client_id: Some(client),
+                client_id: Some(client_id),
                 file_id,
             } => {
                 println!(
                     "Get file content request from: {:?} for file: {:?}",
-                    &client.uuid, file_id
+                    &client_id.uuid, file_id
                 );
                 match self.storage.get_file_content(file_id) {
                     Ok(content) => Ok(Response::new(content)),
@@ -450,9 +450,16 @@ mod tests {
                     .await
                     .expect("failed to get file content")
                     .into_inner();
-                let actual = std::str::from_utf8(&content.body).expect("expect body to be valid utf-8");
+                let actual =
+                    std::str::from_utf8(&content.body).expect("expect body to be valid utf-8");
                 // XXX: hardcoded content
-                let file = client.get_file(tonic::Request::new(file_request)).await.expect("failed to get file details").into_inner().file.expect("unexpected");
+                let file = client
+                    .get_file(tonic::Request::new(file_request))
+                    .await
+                    .expect("failed to get file details")
+                    .into_inner()
+                    .file
+                    .expect("unexpected");
                 let expected = format!("# {} content", file.name);
                 assert_eq!(actual, expected);
             }

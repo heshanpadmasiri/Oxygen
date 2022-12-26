@@ -1,4 +1,7 @@
-use std::{path::{Path, PathBuf}, io::{BufReader, Read}};
+use std::{
+    io::{BufReader, Read},
+    path::{Path, PathBuf},
+};
 
 // XXX: it is better if the collection module take the view of files as is instead of
 // trying to match the gRPC message types
@@ -199,15 +202,26 @@ fn handle_content(handle: &Handle) -> Vec<u8> {
     let file = std::fs::File::open(&handle.path).expect("expect file opening to succeed");
     let mut reader = BufReader::new(file);
     let mut buffer = Vec::new();
-    reader.read_to_end(&mut buffer).expect("expect file read to succeed");
+    reader
+        .read_to_end(&mut buffer)
+        .expect("expect file read to succeed");
     buffer
 }
 
 #[cfg(test)]
 mod tests {
 
-    use super::index_storage;
-    use std::path::Path;
+    use crate::{
+        oxygen::{Collection, File},
+        storage::FromHandle,
+    };
+
+    use super::{index_storage, Handle, HandleType, Storage};
+    use std::{
+        collections::HashSet,
+        io::{BufReader, Read},
+        path::Path,
+    };
 
     const TEST_STORAGE_ROOT: &str = "./test_storage/";
     #[test]
@@ -215,5 +229,93 @@ mod tests {
         let handles = index_storage(Path::new(TEST_STORAGE_ROOT))
             .expect("Indexing hardcoded storage must succeed");
         assert!(handles.len() == 10)
+    }
+
+    #[test]
+    fn can_get_all_collections() {
+        let storage = Storage::new();
+        let collections = storage.get_collection_all();
+        let mut unique_ids = HashSet::new();
+        // assert all ids are unique
+        assert!(collections
+            .iter()
+            .map(|collection| { collection.id })
+            .all(|id| unique_ids.insert(id)));
+
+        // assert we got all the collections and handle index is same as collection id
+        assert!(collection_handles()
+            .iter()
+            .map(|handle| { handle.index as u64 })
+            .all(|index| unique_ids.contains(&index)));
+    }
+
+    #[test]
+    fn can_get_individual_collection() {
+        let storage = Storage::new();
+        let handles = handles();
+        for handle in collection_handles() {
+            let collection = storage
+                .get_collection(handle.index as u64)
+                .expect("getting collection should not fail");
+            assert_eq!(handle.index as u64, collection.id);
+            let expected = Collection::from_handle(&handle, &handles);
+            assert_eq!(expected, collection);
+        }
+    }
+
+    #[test]
+    fn can_get_individual_files() {
+        let storage = Storage::new();
+        let handles = handles();
+        for handle in file_handles() {
+            let file = storage
+                .get_file(handle.index as u64)
+                .expect("getting file should not fail");
+            assert_eq!(handle.index as u64, file.id);
+            let expected = File::from_handle(&handle, &handles);
+            assert_eq!(expected, file);
+        }
+    }
+
+    #[test]
+    fn can_get_individual_file_content() {
+        let storage = Storage::new();
+        for handle in file_handles() {
+            let actual = storage
+                .get_file_content(handle.index as u64)
+                .expect("getting file content should not fail");
+            let file = std::fs::File::open(&handle.path).expect("expect file opening to succeed");
+            let mut reader = BufReader::new(file);
+            let mut expected = Vec::new();
+            reader
+                .read_to_end(&mut expected)
+                .expect("expect hardcoded file read to succeed");
+            assert_eq!(actual, expected);
+        }
+    }
+
+    fn collection_handles() -> Vec<Handle> {
+        handles()
+            .into_iter()
+            .filter(|handle| match handle.handle_type {
+                HandleType::Directory => true,
+                HandleType::File => false,
+            })
+            .collect()
+    }
+
+    fn file_handles() -> Vec<Handle> {
+        handles()
+            .into_iter()
+            .filter(|handle| match handle.handle_type {
+                HandleType::Directory => false,
+                HandleType::File => true,
+            })
+            .collect()
+    }
+
+    fn handles() -> Vec<Handle> {
+        index_storage(Path::new(TEST_STORAGE_ROOT))
+            .expect("indexing hardcoded storage must succeed")
     }
 }

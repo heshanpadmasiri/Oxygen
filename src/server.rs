@@ -1,9 +1,9 @@
-use storage::{Storage};
 use oxygen::{
     oxygen_server::{Oxygen, OxygenServer},
     ClientId, CollectionRequest, CollectionResponse, FileContent, FileRequest, FileResponse,
     RegResponse,
 };
+use storage::Storage;
 use tonic::{Request, Response, Status};
 use uuid::Uuid;
 
@@ -450,8 +450,9 @@ mod tests {
                     .await
                     .expect("failed to get file content")
                     .into_inner();
-                let actual =
-                    std::str::from_utf8(&content.body).expect("expect body to be valid utf-8").trim();
+                let actual = std::str::from_utf8(&content.body)
+                    .expect("expect body to be valid utf-8")
+                    .trim();
                 // XXX: hardcoded content
                 let file = client
                     .get_file(tonic::Request::new(file_request))

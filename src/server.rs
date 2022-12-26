@@ -1,4 +1,4 @@
-use collection::{HardCodedStorage, Storage};
+use storage::{HardCodedStorage, Storage};
 use oxygen::{
     oxygen_server::{Oxygen, OxygenServer},
     ClientId, CollectionRequest, CollectionResponse, FileContent, FileRequest, FileResponse,
@@ -7,7 +7,7 @@ use oxygen::{
 use tonic::{Request, Response, Status};
 use uuid::Uuid;
 
-mod collection;
+mod storage;
 
 pub mod oxygen {
     tonic::include_proto!("oxygen_lib");

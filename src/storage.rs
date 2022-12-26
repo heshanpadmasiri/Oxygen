@@ -5,7 +5,6 @@ use std::path::{Path, PathBuf};
 // trying to match the gRPC message types
 use crate::oxygen::{Collection, File, FileContent};
 
-// TODO: remove this trait and rename hardcoded storage to be storage
 pub trait Storage {
     // TODO: this needs to be a singleton
     fn new() -> Self

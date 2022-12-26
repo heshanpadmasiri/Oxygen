@@ -1,7 +1,11 @@
+use std::path::{Path, PathBuf};
+
+// TODO: rename this module to storage
 // XXX: it is better if the collection module take the view of files as is instead of
 // trying to match the gRPC message types
 use crate::oxygen::{Collection, File, FileContent};
 
+// TODO: remove this trait and rename hardcoded storage to be storage
 pub trait Storage {
     // TODO: this needs to be a singleton
     fn new() -> Self
@@ -18,6 +22,78 @@ pub trait Storage {
 pub struct HardCodedStorage {
     hard_coded_collections: Vec<Collection>,
     hard_coded_files: Vec<File>,
+}
+
+#[derive(Debug)]
+pub enum StorageErr {
+    NotADirectory,
+    NotAFile,
+    InvalidPath,
+}
+
+/// Use to represent an "item" in storage. All storage APIs will use these as identifiers for directories / files
+#[derive(Debug)]
+struct Handle {
+    handle_type: HandleType,
+    path: PathBuf,
+    index: usize,
+    child_indices: Vec<usize>,
+}
+
+#[derive(Debug)]
+enum HandleType {
+    File,
+    Directory,
+}
+
+const STORAGE_ROOT: &str = "./test_storage";
+
+/// Starting from the root directory recursively create handles for each file and directory
+fn index_storage(root: &Path) -> Result<Vec<Handle>, StorageErr> {
+    if !root.exists() {
+        return Err(StorageErr::InvalidPath);
+    }
+    if !root.is_dir() {
+        return Err(StorageErr::NotAFile);
+    }
+    let mut handles = Vec::new();
+    index_storage_inner(root, &mut handles);
+    Ok(handles)
+}
+
+fn index_storage_inner(path: &Path, handles: &mut Vec<Handle>) -> Option<usize> {
+    // TODO: properly handle symlink
+    if path.is_symlink() {
+        return None;
+    }
+    let index = handles.len();
+    if path.is_file() {
+        if let Some(extension) = path.extension() {
+            if extension == "md" {
+                handles.push(Handle {
+                    handle_type: HandleType::File,
+                    path: path.to_path_buf(),
+                    index,
+                    child_indices: vec![],
+                });
+                return Some(index);
+            }
+        }
+        return None;
+    }
+    let mut child_indices = vec![];
+    for entry in path.read_dir().expect("read_dir call failed").flatten() {
+        if let Some(index) = index_storage_inner(&entry.path(), handles) {
+            child_indices.push(index);
+        }
+    }
+    handles.push(Handle {
+        handle_type: HandleType::Directory,
+        path: path.to_path_buf(),
+        index,
+        child_indices,
+    });
+    Some(index)
 }
 
 /// Hardcoded file structure
@@ -125,5 +201,20 @@ impl Storage for HardCodedStorage {
             }
             Err(_) => Err(()),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::index_storage;
+    use std::path::Path;
+
+    const TEST_STORAGE_ROOT: &str = "./test_storage/";
+    #[test]
+    fn can_index_test_storage() {
+        let handles = index_storage(Path::new(TEST_STORAGE_ROOT))
+            .expect("Indexing hardcoded storage must succeed");
+        assert!(handles.len() == 10)
     }
 }

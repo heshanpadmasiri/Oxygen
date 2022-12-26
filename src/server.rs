@@ -138,7 +138,7 @@ impl Oxygen for OxygenService {
                     &client_id.uuid, file_id
                 );
                 match self.storage.get_file_content(file_id) {
-                    Ok(content) => Ok(Response::new(content)),
+                    Ok(body) => Ok(Response::new(FileContent { body })),
                     Err(()) => Err(Status::new(
                         tonic::Code::InvalidArgument,
                         format!("Failed to find file with id: {}", file_id),
@@ -451,7 +451,7 @@ mod tests {
                     .expect("failed to get file content")
                     .into_inner();
                 let actual =
-                    std::str::from_utf8(&content.body).expect("expect body to be valid utf-8");
+                    std::str::from_utf8(&content.body).expect("expect body to be valid utf-8").trim();
                 // XXX: hardcoded content
                 let file = client
                     .get_file(tonic::Request::new(file_request))

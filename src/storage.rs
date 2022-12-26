@@ -1,8 +1,8 @@
-use std::path::{Path, PathBuf};
+use std::{path::{Path, PathBuf}, io::{BufReader, Read}};
 
 // XXX: it is better if the collection module take the view of files as is instead of
 // trying to match the gRPC message types
-use crate::oxygen::{Collection, File, FileContent};
+use crate::oxygen::{Collection, File};
 
 pub struct Storage {
     handles: Vec<Handle>,
@@ -180,15 +180,27 @@ impl Storage {
         }
     }
 
-    pub fn get_file_content(&self, id: u64) -> Result<FileContent, ()> {
-        match self.get_file(id) {
-            Ok(file) => {
-                let body = format!("# {} content", file.name).as_bytes().to_vec();
-                Ok(FileContent { body })
+    pub fn get_file_content(&self, id: u64) -> Result<Vec<u8>, ()> {
+        let index: usize = id.try_into().unwrap();
+        if index < self.handles.len() {
+            let handle = &self.handles[index];
+            match handle.handle_type {
+                HandleType::File => Ok(handle_content(handle)),
+                HandleType::Directory => Err(()),
             }
-            Err(_) => Err(()),
+        } else {
+            Err(())
         }
     }
+}
+
+fn handle_content(handle: &Handle) -> Vec<u8> {
+    assert!(matches!(handle.handle_type, HandleType::File));
+    let file = std::fs::File::open(&handle.path).expect("expect file opening to succeed");
+    let mut reader = BufReader::new(file);
+    let mut buffer = Vec::new();
+    reader.read_to_end(&mut buffer).expect("expect file read to succeed");
+    buffer
 }
 
 #[cfg(test)]

@@ -1,13 +1,13 @@
-use collection::{HardCodedStorage, Storage};
 use oxygen::{
     oxygen_server::{Oxygen, OxygenServer},
     ClientId, CollectionRequest, CollectionResponse, FileContent, FileRequest, FileResponse,
     RegResponse,
 };
+use storage::Storage;
 use tonic::{Request, Response, Status};
 use uuid::Uuid;
 
-mod collection;
+mod storage;
 
 pub mod oxygen {
     tonic::include_proto!("oxygen_lib");
@@ -15,15 +15,14 @@ pub mod oxygen {
 
 pub struct OxygenService {
     id: Uuid,
-    // TODO: think how we can have different types for this (probably we will do this as an enum)
-    storage: HardCodedStorage,
+    storage: Storage,
 }
 
 impl Default for OxygenService {
     fn default() -> Self {
         Self {
             id: uuid::Uuid::new_v4(),
-            storage: HardCodedStorage::new(),
+            storage: Storage::new(),
         }
     }
 }
@@ -139,7 +138,7 @@ impl Oxygen for OxygenService {
                     &client_id.uuid, file_id
                 );
                 match self.storage.get_file_content(file_id) {
-                    Ok(content) => Ok(Response::new(content)),
+                    Ok(body) => Ok(Response::new(FileContent { body })),
                     Err(()) => Err(Status::new(
                         tonic::Code::InvalidArgument,
                         format!("Failed to find file with id: {}", file_id),
@@ -266,12 +265,13 @@ mod tests {
                 .expect("failed to get get all collections")
                 .into_inner();
             // XXX: hardcoded collection
-            assert!(collection_res.collections.len() == 5);
+            assert!(collection_res.collections.len() == 6);
         })
         .await
         .expect("failed to run client");
         join_handle.abort()
     }
+
     #[tokio::test]
     async fn client_can_get_collection_by_id() {
         let port = 50054;
@@ -300,7 +300,7 @@ mod tests {
                 .await
                 .expect("failed to register with server");
             // XXX: hardcoded storage
-            for id in 0..5 {
+            for id in [2, 3, 4, 6, 8, 9] {
                 let collection_request = CollectionRequest {
                     client_id: Some(ClientId {
                         uuid: uuid.to_owned(),
@@ -346,7 +346,7 @@ mod tests {
                 .await
                 .expect("failed to register with server");
             // XXX: hardcoded storage
-            for id in [100, 10000000] {
+            for id in [0, 1, 5, 7, 100, 10000000] {
                 let collection_request = CollectionRequest {
                     client_id: Some(ClientId {
                         uuid: uuid.to_owned(),
@@ -392,7 +392,7 @@ mod tests {
                 .await
                 .expect("failed to register with server");
             // XXX: hardcoded storage
-            for id in 0..4 {
+            for id in [0, 1, 5, 7] {
                 let file_request = FileRequest {
                     client_id: Some(ClientId {
                         uuid: uuid.to_owned(),
@@ -438,7 +438,7 @@ mod tests {
                 .await
                 .expect("failed to register with server");
             // XXX: hardcoded storage
-            for id in 0..4 {
+            for id in [0, 1, 5, 7] {
                 let file_request = FileRequest {
                     client_id: Some(ClientId {
                         uuid: uuid.to_owned(),
@@ -450,8 +450,9 @@ mod tests {
                     .await
                     .expect("failed to get file content")
                     .into_inner();
-                let actual =
-                    std::str::from_utf8(&content.body).expect("expect body to be valid utf-8");
+                let actual = std::str::from_utf8(&content.body)
+                    .expect("expect body to be valid utf-8")
+                    .trim();
                 // XXX: hardcoded content
                 let file = client
                     .get_file(tonic::Request::new(file_request))
@@ -497,7 +498,7 @@ mod tests {
                 .await
                 .expect("failed to register with server");
             // XXX: hardcoded storage
-            for id in [100, 10000000] {
+            for id in [2, 3, 4, 6, 8, 9, 100, 10000000] {
                 let file_request = FileRequest {
                     client_id: Some(ClientId {
                         uuid: uuid.to_owned(),

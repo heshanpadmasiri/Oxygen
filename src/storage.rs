@@ -1,31 +1,15 @@
 use std::path::{Path, PathBuf};
 
-// TODO: rename this module to storage
 // XXX: it is better if the collection module take the view of files as is instead of
 // trying to match the gRPC message types
 use crate::oxygen::{Collection, File, FileContent};
 
-pub trait Storage {
-    // TODO: this needs to be a singleton
-    fn new() -> Self
-    where
-        Self: Sized;
-    fn get_collection_all(&self) -> Vec<Collection>;
-    // TODO: this needs to return proper errors
-    fn get_collection(&self, id: u64) -> Result<Collection, ()>;
-    // TODO: this needs to return proper errors
-    fn get_file(&self, id: u64) -> Result<File, ()>;
-    fn get_file_content(&self, id: u64) -> Result<FileContent, ()>;
-}
-
-pub struct HardCodedStorage {
-    hard_coded_collections: Vec<Collection>,
-    hard_coded_files: Vec<File>,
+pub struct Storage {
+    handles: Vec<Handle>,
 }
 
 #[derive(Debug)]
 pub enum StorageErr {
-    NotADirectory,
     NotAFile,
     InvalidPath,
 }
@@ -43,6 +27,58 @@ struct Handle {
 enum HandleType {
     File,
     Directory,
+}
+// This is an infallible dereference
+trait FromHandle {
+    fn from_handle(handle: &Handle, handles: &[Handle]) -> Self;
+}
+impl FromHandle for File {
+    fn from_handle(handle: &Handle, _handles: &[Handle]) -> Self {
+        assert!(matches!(handle.handle_type, HandleType::File));
+        File {
+            name: handle_name(handle),
+            id: handle.index as u64,
+        }
+    }
+}
+
+impl FromHandle for Collection {
+    fn from_handle(handle: &Handle, handles: &[Handle]) -> Self {
+        assert!(matches!(handle.handle_type, HandleType::Directory));
+        let mut child_collection_handles = Vec::new();
+        let mut child_file_handles = Vec::new();
+        for child_index in &handle.child_indices {
+            let child = &handles[*child_index];
+            match child.handle_type {
+                HandleType::Directory => child_collection_handles.push(child),
+                HandleType::File => child_file_handles.push(child),
+            }
+        }
+        let child_collections: Vec<Collection> = child_collection_handles
+            .iter()
+            .map(|handle| Collection::from_handle(handle, handles))
+            .collect();
+        let files: Vec<File> = child_file_handles
+            .iter()
+            .map(|handle| File::from_handle(handle, handles))
+            .collect();
+        Collection {
+            name: handle_name(handle),
+            id: handle.index as u64,
+            child_collections,
+            files,
+        }
+    }
+}
+
+fn handle_name(handle: &Handle) -> String {
+    handle
+        .path
+        .file_name()
+        .expect("expect handle to have a name")
+        .to_str()
+        .expect("expect a valid name")
+        .to_string()
 }
 
 const STORAGE_ROOT: &str = "./test_storage";
@@ -65,10 +101,10 @@ fn index_storage_inner(path: &Path, handles: &mut Vec<Handle>) -> Option<usize> 
     if path.is_symlink() {
         return None;
     }
-    let index = handles.len();
     if path.is_file() {
         if let Some(extension) = path.extension() {
             if extension == "md" {
+                let index = handles.len();
                 handles.push(Handle {
                     handle_type: HandleType::File,
                     path: path.to_path_buf(),
@@ -86,6 +122,7 @@ fn index_storage_inner(path: &Path, handles: &mut Vec<Handle>) -> Option<usize> 
             child_indices.push(index);
         }
     }
+    let index = handles.len();
     handles.push(Handle {
         handle_type: HandleType::Directory,
         path: path.to_path_buf(),
@@ -95,104 +132,55 @@ fn index_storage_inner(path: &Path, handles: &mut Vec<Handle>) -> Option<usize> 
     Some(index)
 }
 
-/// Hardcoded file structure
-/// collection 4
-/// -- collection 3
-/// -- -- collection 2
-/// -- -- -- f 3.md
-/// -- -- -- f_4.md
-/// -- -- collection 1
-/// -- -- -- collection_0
-/// -- -- f 2.md
-/// -- f_1.md
-impl Storage for HardCodedStorage {
-    fn new() -> Self
+impl Storage {
+    pub fn new() -> Self
     where
         Self: Sized,
     {
-        let collection_0 = Collection {
-            name: "collection_1".to_string(),
-            id: 0,
-            child_collections: vec![],
-            files: vec![],
-        };
-        let f_2 = File {
-            name: "f 2.md".to_string(),
-            id: 0,
-        };
-        let collection_1 = Collection {
-            name: "collection 1".to_string(),
-            id: 1,
-            child_collections: vec![collection_0.clone()],
-            files: vec![f_2.clone()],
-        };
-        let f_3 = File {
-            name: "f 3.md".to_string(),
-            id: 1,
-        };
-        let f_4 = File {
-            name: "f_4.md".to_string(),
-            id: 2,
-        };
-        let collection_2 = Collection {
-            name: "collection 2".to_string(),
-            id: 2,
-            child_collections: vec![],
-            files: vec![f_3.clone(), f_4.clone()],
-        };
-        let collection_3 = Collection {
-            name: "collection 3".to_string(),
-            id: 3,
-            child_collections: vec![collection_2.clone(), collection_1.clone()],
-            files: vec![f_2.clone()],
-        };
-        let f_1 = File {
-            name: "f_1.md".to_string(),
-            id: 3,
-        };
-        let collection_4 = Collection {
-            name: "collection 4".to_string(),
-            id: 4,
-            child_collections: vec![collection_3.clone()],
-            files: vec![f_1.clone()],
-        };
-        let hard_coded_collections = vec![
-            collection_0,
-            collection_1,
-            collection_2,
-            collection_3,
-            collection_4,
-        ];
-        let hard_coded_files = vec![f_1, f_2, f_3, f_4];
+        // FIXME: handle errors when we can have custom root
         Self {
-            hard_coded_collections,
-            hard_coded_files,
+            handles: index_storage(&Path::new(STORAGE_ROOT))
+                .expect("expect storage initialization to succeed"),
         }
     }
 
-    fn get_collection_all(&self) -> Vec<Collection> {
-        self.hard_coded_collections.clone()
+    pub fn get_collection_all(&self) -> Vec<Collection> {
+        self.handles
+            .iter()
+            .filter_map(|handle| match handle.handle_type {
+                HandleType::File => None,
+                HandleType::Directory => Some(Collection::from_handle(handle, &self.handles)),
+            })
+            .collect()
     }
 
-    fn get_collection(&self, id: u64) -> Result<Collection, ()> {
+    pub fn get_collection(&self, id: u64) -> Result<Collection, ()> {
         let index: usize = id.try_into().unwrap();
-        if index < self.hard_coded_collections.len() {
-            Ok(self.hard_coded_collections[index].clone())
+        if index < self.handles.len() {
+            let handle = &self.handles[index];
+            match handle.handle_type {
+                HandleType::File => Err(()),
+                HandleType::Directory => Ok(Collection::from_handle(handle, &self.handles)),
+            }
         } else {
             Err(())
         }
     }
 
-    fn get_file(&self, id: u64) -> Result<File, ()> {
+    pub fn get_file(&self, id: u64) -> Result<File, ()> {
         let index: usize = id.try_into().unwrap();
-        if index < self.hard_coded_files.len() {
-            Ok(self.hard_coded_files[index].clone())
+        if index < self.handles.len() {
+            let handle = &self.handles[index];
+            match handle.handle_type {
+                HandleType::File => Ok(File::from_handle(handle, &self.handles)),
+                HandleType::Directory => Err(()),
+            }
         } else {
             Err(())
         }
     }
 
-    fn get_file_content(&self, id: u64) -> Result<FileContent, ()> {
+    pub fn get_file_content(&self, id: u64) -> Result<FileContent, ()> {
         match self.get_file(id) {
             Ok(file) => {
                 let body = format!("# {} content", file.name).as_bytes().to_vec();

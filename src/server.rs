@@ -1,4 +1,4 @@
-use storage::{HardCodedStorage, Storage};
+use storage::{Storage};
 use oxygen::{
     oxygen_server::{Oxygen, OxygenServer},
     ClientId, CollectionRequest, CollectionResponse, FileContent, FileRequest, FileResponse,
@@ -15,15 +15,14 @@ pub mod oxygen {
 
 pub struct OxygenService {
     id: Uuid,
-    // TODO: think how we can have different types for this (probably we will do this as an enum)
-    storage: HardCodedStorage,
+    storage: Storage,
 }
 
 impl Default for OxygenService {
     fn default() -> Self {
         Self {
             id: uuid::Uuid::new_v4(),
-            storage: HardCodedStorage::new(),
+            storage: Storage::new(),
         }
     }
 }
@@ -266,12 +265,13 @@ mod tests {
                 .expect("failed to get get all collections")
                 .into_inner();
             // XXX: hardcoded collection
-            assert!(collection_res.collections.len() == 5);
+            assert!(collection_res.collections.len() == 6);
         })
         .await
         .expect("failed to run client");
         join_handle.abort()
     }
+
     #[tokio::test]
     async fn client_can_get_collection_by_id() {
         let port = 50054;
@@ -300,7 +300,7 @@ mod tests {
                 .await
                 .expect("failed to register with server");
             // XXX: hardcoded storage
-            for id in 0..5 {
+            for id in [2, 3, 4, 6, 8, 9] {
                 let collection_request = CollectionRequest {
                     client_id: Some(ClientId {
                         uuid: uuid.to_owned(),
@@ -346,7 +346,7 @@ mod tests {
                 .await
                 .expect("failed to register with server");
             // XXX: hardcoded storage
-            for id in [100, 10000000] {
+            for id in [0, 1, 5, 7, 100, 10000000] {
                 let collection_request = CollectionRequest {
                     client_id: Some(ClientId {
                         uuid: uuid.to_owned(),
@@ -392,7 +392,7 @@ mod tests {
                 .await
                 .expect("failed to register with server");
             // XXX: hardcoded storage
-            for id in 0..4 {
+            for id in [0, 1, 5, 7] {
                 let file_request = FileRequest {
                     client_id: Some(ClientId {
                         uuid: uuid.to_owned(),
@@ -438,7 +438,7 @@ mod tests {
                 .await
                 .expect("failed to register with server");
             // XXX: hardcoded storage
-            for id in 0..4 {
+            for id in [0, 1, 5, 7] {
                 let file_request = FileRequest {
                     client_id: Some(ClientId {
                         uuid: uuid.to_owned(),
@@ -497,7 +497,7 @@ mod tests {
                 .await
                 .expect("failed to register with server");
             // XXX: hardcoded storage
-            for id in [100, 10000000] {
+            for id in [2, 3, 4, 6, 8, 9, 100, 10000000] {
                 let file_request = FileRequest {
                     client_id: Some(ClientId {
                         uuid: uuid.to_owned(),

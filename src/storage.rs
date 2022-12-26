@@ -139,7 +139,7 @@ impl Storage {
     {
         // FIXME: handle errors when we can have custom root
         Self {
-            handles: index_storage(&Path::new(STORAGE_ROOT))
+            handles: index_storage(Path::new(STORAGE_ROOT))
                 .expect("expect storage initialization to succeed"),
         }
     }
